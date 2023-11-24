@@ -21,7 +21,7 @@ impl FromStr for Thing {
     }
 }
 
-#[aoc_generator(day01)]
+#[aoc_generator(dayXX)]
 pub fn input_generator(input: &str) -> Result<Vec<Thing>> {
     input
         .split("\n\n")
@@ -31,7 +31,7 @@ pub fn input_generator(input: &str) -> Result<Vec<Thing>> {
         .context("Error while parsing input")
 }
 
-#[aoc(day01, part1)]
+#[aoc(dayXX, part1)]
 pub fn solve_part1(input: &[Thing]) -> Result<u32> {
     let max = input
         .iter()
@@ -42,7 +42,7 @@ pub fn solve_part1(input: &[Thing]) -> Result<u32> {
     Ok(max)
 }
 
-#[aoc(day01, part2)]
+#[aoc(dayXX, part2)]
 pub fn solve_part2(input: &[Thing]) -> Result<u32> {
     let top_three = input
         .iter()
