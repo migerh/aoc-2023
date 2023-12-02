@@ -10,6 +10,7 @@ extern crate regex;
 extern crate serde_json;
 
 pub mod day01;
+pub mod day02;
 pub mod utils;
 
 aoc_lib! { year = 2023 }
