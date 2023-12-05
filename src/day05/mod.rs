@@ -1,4 +1,5 @@
 use anyhow::{Context, Error, Result};
+use rayon::{slice::ParallelSlice, iter::ParallelIterator};
 use std::str::FromStr;
 
 use crate::utils::AocError::*;
@@ -118,7 +119,7 @@ pub fn solve_part1(input: &Almanac) -> Result<i128> {
 
 #[aoc(day05, part2)]
 pub fn solve_part2(input: &Almanac) -> Result<i128> {
-    let min = input.seeds.chunks_exact(2).filter_map(|r| {
+    let min = input.seeds.par_chunks_exact(2).filter_map(|r| {
         let start = r[0];
         let end = r[0] + r[1];
         (start..end).map(|s| input.map_seed(s)).min()
