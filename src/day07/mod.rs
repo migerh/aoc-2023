@@ -19,7 +19,7 @@ pub fn input_generator(input: &str) -> Result<Vec<Hand>> {
 #[aoc(day07, part1)]
 pub fn solve_part1(input: &[Hand]) -> Result<usize> {
     let mut hands = input.to_vec();
-    hands.sort_by(|a, b| a.compare_with(b));
+    hands.sort();
 
     let result = hands
         .iter()
@@ -32,8 +32,8 @@ pub fn solve_part1(input: &[Hand]) -> Result<usize> {
 
 #[aoc(day07, part2)]
 pub fn solve_part2(input: &[Hand]) -> Result<usize> {
-    let mut hands = input.to_vec();
-    hands.sort_by(|a, b| a.compare_with_joker_with(b));
+    let mut hands = input.iter().map(|h| h.to_joker()).collect::<Vec<_>>();
+    hands.sort();
 
     let result = hands
         .iter()

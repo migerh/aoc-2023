@@ -4,6 +4,48 @@ use anyhow::{Error, Result, Context};
 
 use crate::utils::AocError::*;
 
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+pub enum Card {
+    Joker,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace,
+}
+
+impl Card {
+    fn from_char(s: char) -> Result<Self> {
+        use Card::*;
+
+        Ok(match s {
+            'A' => Ace,
+            'K' => King,
+            'Q' => Queen,
+            'J' => Jack,
+            'T' => Ten,
+            '9' => Nine,
+            '8' => Eight,
+            '7' => Seven,
+            '6' => Six,
+            '5' => Five,
+            '4' => Four,
+            '3' => Three,
+            '2' => Two,
+            'X' => Joker,
+            _ => Err(GenericError).context("Could not parse card")?
+        })
+    }
+}
+
 #[derive(PartialEq, PartialOrd, Debug, Eq, Ord)]
 pub enum Kind {
     HighCard,
@@ -15,9 +57,9 @@ pub enum Kind {
     Five,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hand {
-    pub cards: Vec<char>,
+    pub cards: Vec<Card>,
     pub bid: u32,
 }
 
@@ -32,7 +74,9 @@ impl FromStr for Hand {
             .ok_or(GenericError)
             .context("Could not parse cards")?
             .chars()
-            .collect::<Vec<_>>();
+            .map(Card::from_char)
+            .collect::<Result<Vec<_>>>()?;
+
         if cards.len() != 5 {
             return Err(GenericError).context("Not exactly five cards");
         }
@@ -42,37 +86,13 @@ impl FromStr for Hand {
             .ok_or(GenericError)
             .context("Could not parse bid")?
             .parse::<u32>()?;
+
         Ok(Hand { cards, bid })
     }
 }
 
 impl Hand {
-    pub fn score_card(c: char) -> Result<u8> {
-        Ok(match c {
-            'A' => 14,
-            'K' => 13,
-            'Q' => 12,
-            'J' => 11,
-            'T' => 10,
-            v => v
-                .to_digit(10)
-                .ok_or(GenericError)
-                .with_context(|| format!("Invalid card: {v}"))? as u8,
-        })
-    }
-
-    pub fn score_card_with_joker(c: char) -> Result<u8> {
-        Ok(match c {
-            'A' => 14,
-            'K' => 13,
-            'Q' => 12,
-            'J' => 1,
-            'T' => 10,
-            _ => c.to_digit(10).ok_or(GenericError)? as u8,
-        })
-    }
-
-    pub fn partition(hand: &[u8]) -> Vec<u8> {
+    pub fn partition(hand: &[Card]) -> Vec<u8> {
         let mut result = vec![1];
         let mut pos = 0;
 
@@ -88,111 +108,77 @@ impl Hand {
         result
     }
 
-    pub fn kind(&self) -> Result<Kind> {
-        let mut scores = self
-            .cards
-            .iter()
-            .map(|c| Self::score_card(*c))
-            .collect::<Result<Vec<_>>>()
-            .context("Could not determine score")?;
+    pub fn to_joker(&self) -> Self {
+        use Card::*;
+        let cards = self.cards.iter().map(|c| if *c == Jack { Joker } else { c.clone() }).collect::<Vec<_>>();
+        let bid = self.bid;
+        Hand { cards, bid }
+    }
+
+    pub fn kind(&self) -> Kind {
+        use Card::*;
+        let mut scores = self.cards.clone();
         scores.sort();
 
         let mut partition = Self::partition(&scores);
         partition.sort();
 
         if partition.len() == 1 && partition[0] == 5 {
-            return Ok(Kind::Five);
+            return Kind::Five;
         }
 
         if partition.len() == 2 && partition[0] == 1 && partition[1] == 4 {
-            return Ok(Kind::Four);
+            if scores[0] == Joker {
+                return Kind::Five;
+            }
+
+            return Kind::Four;
         }
 
         if partition.len() == 2 && partition[0] == 2 && partition[1] == 3 {
-            return Ok(Kind::FullHouse);
+            if scores[0] == Joker {
+                return Kind::Five;
+            }
+            return Kind::FullHouse;
         }
 
         if partition.len() == 3 && partition[0] == 1 && partition[1] == 1 && partition[2] == 3 {
-            return Ok(Kind::Three);
+            if scores[0] == Joker {
+                return Kind::Four;
+            }
+            return Kind::Three;
         }
 
         if partition.len() == 3 && partition[0] == 1 && partition[1] == 2 && partition[2] == 2 {
-            return Ok(Kind::TwoPair);
+            if scores[1] == Joker {
+                return Kind::Four;
+            }
+
+            if scores[0] == Joker {
+                return Kind::FullHouse;
+            }
+            return Kind::TwoPair;
         }
 
         if partition.len() == 4 {
-            return Ok(Kind::OnePair);
+            if scores[0] == Joker {
+                return Kind::Three;
+            }
+            return Kind::OnePair;
         }
 
-        Ok(Kind::HighCard)
+        if scores[0] == Joker {
+            return Kind::OnePair;
+        }
+
+        Kind::HighCard
     }
+}
 
-    pub fn kind_with_joker(&self) -> Result<Kind> {
-        let mut scores = self
-            .cards
-            .iter()
-            .map(|c| Self::score_card_with_joker(*c))
-            .collect::<Result<Vec<_>>>()
-            .context("Could not determine scores (with joker)")?;
-        scores.sort();
-
-        let mut partition = Self::partition(&scores);
-        partition.sort();
-
-        if partition.len() == 1 && partition[0] == 5 {
-            return Ok(Kind::Five);
-        }
-
-        if partition.len() == 2 && partition[0] == 1 && partition[1] == 4 {
-            if scores[0] == 1 {
-                return Ok(Kind::Five);
-            }
-
-            return Ok(Kind::Four);
-        }
-
-        if partition.len() == 2 && partition[0] == 2 && partition[1] == 3 {
-            if scores[0] == 1 {
-                return Ok(Kind::Five);
-            }
-            return Ok(Kind::FullHouse);
-        }
-
-        if partition.len() == 3 && partition[0] == 1 && partition[1] == 1 && partition[2] == 3 {
-            if scores[0] == 1 {
-                return Ok(Kind::Four);
-            }
-            return Ok(Kind::Three);
-        }
-
-        if partition.len() == 3 && partition[0] == 1 && partition[1] == 2 && partition[2] == 2 {
-            if scores[1] == 1 {
-                return Ok(Kind::Four);
-            }
-
-            if scores[0] == 1 {
-                return Ok(Kind::FullHouse);
-            }
-            return Ok(Kind::TwoPair);
-        }
-
-        if partition.len() == 4 {
-            if scores[0] == 1 {
-                return Ok(Kind::Three);
-            }
-            return Ok(Kind::OnePair);
-        }
-
-        if scores[0] == 1 {
-            return Ok(Kind::OnePair);
-        }
-
-        Ok(Kind::HighCard)
-    }
-
-    pub fn compare_with(&self, other: &Self) -> Ordering {
-            let self_kind = self.kind().unwrap();
-            let other_kind = other.kind().unwrap();
+impl Ord for Hand {
+    fn cmp(&self, other: &Self) -> Ordering {
+            let self_kind = self.kind();
+            let other_kind = other.kind();
             let kind_match = self_kind == other_kind;
 
             if !kind_match {
@@ -200,35 +186,18 @@ impl Hand {
             } else {
                 for i in 0..5 {
                     if self.cards[i] != other.cards[i] {
-                        return Self
-                            ::score_card(self.cards[i])
-                            .unwrap()
-                            .cmp(&Self::score_card(other.cards[i]).unwrap());
+                        return self.cards[i].cmp(&other.cards[i]);
                     }
                 }
 
                 Ordering::Equal
             }
     }
+}
 
-    pub fn compare_with_joker_with(&self, other: &Self) -> Ordering {
-            let self_kind = self.kind_with_joker().unwrap();
-            let other_kind = other.kind_with_joker().unwrap();
-            let kind_match = self_kind == other_kind;
-
-            if !kind_match {
-                self_kind.cmp(&other_kind)
-            } else {
-                for i in 0..5 {
-                    if self.cards[i] != other.cards[i] {
-                        return Self::score_card_with_joker(self.cards[i])
-                            .unwrap()
-                            .cmp(&Self::score_card_with_joker(other.cards[i]).unwrap());
-                    }
-                }
-
-                Ordering::Equal
-            }
+impl PartialOrd for Hand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
