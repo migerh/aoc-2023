@@ -24,7 +24,7 @@ impl FromStr for Thing {
 #[aoc_generator(dayXX)]
 pub fn input_generator(input: &str) -> Result<Vec<Thing>> {
     input
-        .split("\n\n")
+        .lines()
         .filter(|s| !s.is_empty())
         .map(Thing::from_str)
         .collect::<Result<Vec<_>>>()
@@ -33,26 +33,12 @@ pub fn input_generator(input: &str) -> Result<Vec<Thing>> {
 
 #[aoc(dayXX, part1)]
 pub fn solve_part1(input: &[Thing]) -> Result<u32> {
-    let max = input
-        .iter()
-        .map(|elf| elf.items.iter().sum::<u32>())
-        .max()
-        .ok_or(GenericError)
-        .context("Error while finding the elf with the most food")?;
-    Ok(max)
+    Ok(0)
 }
 
 #[aoc(dayXX, part2)]
 pub fn solve_part2(input: &[Thing]) -> Result<u32> {
-    let top_three = input
-        .iter()
-        .map(|elf| elf.items.iter().sum::<u32>())
-        .sorted()
-        .rev()
-        .take(3)
-        .sum();
-
-    Ok(top_three)
+    Ok(0)
 }
 
 #[cfg(test)]
