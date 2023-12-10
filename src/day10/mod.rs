@@ -7,16 +7,6 @@ type Coords = (usize, usize);
 
 #[aoc_generator(day10)]
 pub fn input_generator(input: &str) -> Result<HashMap<Coords, char>> {
-//     let input = "FF7FSF7F7F7F7F7F---7
-// L|LJ||||||||||||F--J
-// FL-7LJLJ||||||LJL-77
-// F--JF--7||LJLJ7F7FJ-
-// L---JF-JLJ.||-FJLJJ7
-// |F|F-JF---7F7-L7L|7|
-// |FFJF7L7F-JF7|JL---7
-// 7-L-JL7||F7|L7F-7F7|
-// L.L7LFJ|||||FJL7||LJ
-// L7JLJL-JLJLJL--JLJ.L";
     let mut map = HashMap::new();
     input
         .lines()
@@ -90,7 +80,6 @@ pub fn path(map: &HashMap<Coords, char>) -> Option<Vec<Coords>> {
             return Some(path);
         }
 
-        // println!("pos {:?}, cands {:?}, counter {}", pos, candidates, counter);
         if let Some(next) = candidates.into_iter().find(|s| *s != previous) {
             previous = pos;
             pos = next;
@@ -108,7 +97,7 @@ pub fn solve_part1(input: &HashMap<Coords, char>) -> Result<usize> {
     let len = path(input)
         .ok_or(GenericError)
         .context("Could not determine path")?
-        .len();
+        .len() - 1; // 'S' is both start and end of the path
     Ok(len / 2)
 }
 
@@ -137,10 +126,8 @@ pub fn rebuild_pipeline(map: &HashMap<Coords, char>, path: &[Coords]) -> Vec<Vec
         }
     });
 
-    println!("{:?}, {:?}", min, max);
-
     let mut m = vec![vec!['.'; max.0 - min.0 + 1]; max.1 - min.1 + 1];
-    for y in min.1..=max.1 {
+    (min.1..=max.1).for_each(|y| {
         for x in min.0..=max.0 {
             if let Some(c) = map.get(&(x, y)) {
                 if path.contains(&(x, y)) {
@@ -148,7 +135,7 @@ pub fn rebuild_pipeline(map: &HashMap<Coords, char>, path: &[Coords]) -> Vec<Vec
                 }
             }
         }
-    }
+    });
 
     m
 }
@@ -163,21 +150,14 @@ pub fn is_start_relevant(path: &[Coords]) -> bool {
             let l0 = l.0 as isize;
             let l1 = l.1 as isize;
 
-            println!("({}, {}) -> ({}, {})", f0, f1, l0, l1);
-
             // |
             let is_vertical_pipe = f0 == l0 && ((l1 > f1 && l1 - f1 == 2) || (l1 < f1 && f1 - l1 == 2));
             // J
-            // let is_j_pipe = (s0 < e0 && e0 - s0 == 1 && e1 - s1 == 1) || (s0 > e0 && s1 - e1 == 1 && s0 - e0 == 1);
             let is_j_pipe = (f0 < l0 && l1 < f1 && l0 - f0 == 1 && f1 - l1 == 1 && (s0, s1) == (f0 + 1, f1)) ||
                 (f0 > l0 && l1 > f1 && f0 - l0 == 1 && l1 - f1 == 1 && (s0, s1) == (l0 + 1, l1));
             // L
-            // let is_l_pipe = (s0 < e0 && e0 - s0 == 1 && e1 - s1 == 1) || (s0 > e0 && s1 - e1 == 1 && s0 - e0 == 1);
             let is_l_pipe = (f0 < l0 && l1 > f1 && l0 - f0 == 1 && l1 - f1 == 1 && (s0, s1) == (f0, f1 + 1)) ||
                 (f0 > l0 && f1 > l1 && f0 - l0 == 1 && f1 - l1 == 1 && (s0, s1) == (l0, l1 + 1));
-
-            println!("start: {} or {} or {}", is_vertical_pipe, is_j_pipe, is_l_pipe);
-
 
             is_vertical_pipe || is_j_pipe || is_l_pipe
         },
@@ -191,18 +171,13 @@ pub fn solve_part2(input: &HashMap<Coords, char>) -> Result<usize> {
         .ok_or(GenericError)
         .context("Could not determine path")?;
 
-    println!("path {:?}", path);
-
     let map = rebuild_pipeline(input, &path);
 
-    // whether the S is in here needs to be determined by looking at the input, not hard coding it
-    // all examples need it to be left out, the real input requires it to be left in
-    // let relevant_pipes = ['J', '|', 'L', 'S'];
     let mut relevant_pipes = vec!['|', 'J', 'L'];
     if is_start_relevant(&path) {
-        println!("Start is relevant");
         relevant_pipes.push('S');
     }
+
     let mut is_inside = false;
     let mut counter = 0;
     map.iter().for_each(|l| {
