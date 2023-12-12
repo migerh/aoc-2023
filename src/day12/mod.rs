@@ -1,21 +1,14 @@
 use anyhow::{Context, Error, Result};
 use itertools::Itertools;
-use num::pow;
+use memoize::memoize;
 use std::str::FromStr;
 
 use crate::utils::AocError::*;
 
 #[derive(Debug)]
-pub enum Type {
-    Spring(u32),
-    Broken(u32),
-    Unknown(u32),
-}
-
-#[derive(Debug)]
 pub struct SpringConfig {
     springs: Vec<char>,
-    config: Vec<u32>,
+    config: Vec<usize>,
 }
 
 impl FromStr for SpringConfig {
@@ -34,7 +27,7 @@ impl FromStr for SpringConfig {
             .ok_or(GenericError)
             .context("Config reading")?
             .split(',')
-            .map(|v| Ok(v.parse::<u32>()?))
+            .map(|v| Ok(v.parse::<usize>()?))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(SpringConfig { springs, config })
@@ -42,92 +35,45 @@ impl FromStr for SpringConfig {
 }
 
 impl SpringConfig {
-    fn partition(springs: &Vec<char>) -> Option<Vec<Type>> {
-        let mut current = springs.first()?;
-        let mut count = 1;
-        let mut partition = vec![];
+    pub fn unfold(&self) -> Self {
+        let springs = vec![
+            self.springs.clone(),
+            vec!['?'],
+            self.springs.clone(),
+            vec!['?'],
+            self.springs.clone(),
+            vec!['?'],
+            self.springs.clone(),
+            vec!['?'],
+            self.springs.clone(),
+        ]
+        .iter()
+        .flatten()
+        .cloned()
+        .collect_vec();
 
-        springs.iter().skip(1).for_each(|s| {
-            if s != current {
-                partition.push(match current {
-                    '?' => Type::Unknown(count),
-                    '.' => Type::Broken(count),
-                    '#' => Type::Spring(count),
-                    _ => panic!("Should never happen"),
-                });
-                current = s;
-                count = 1;
-            } else {
-                count += 1;
-            }
-        });
-        partition.push(match current {
-            '?' => Type::Unknown(count),
-            '.' => Type::Broken(count),
-            '#' => Type::Spring(count),
-            _ => panic!("Should never happen"),
-        });
+        let config = [
+            self.config.clone(),
+            self.config.clone(),
+            self.config.clone(),
+            self.config.clone(),
+            self.config.clone(),
+        ]
+        .iter()
+        .flatten()
+        .cloned()
+        .collect_vec();
 
-        Some(partition)
-    }
-
-    fn eval(v: &Vec<char>) -> Option<Vec<u32>> {
-        let partition = Self::partition(v)?;
-        Some(partition.iter().filter_map(|p| match p {
-            Type::Spring(v) => Some(*v),
-            _ => None
-        }).collect_vec())
-    }
-
-    pub fn brute_force(&self) -> usize {
-        let unknown = self.springs.iter().enumerate().filter_map(|(i, c)| if *c == '?' { Some(i) } else { None }).collect_vec();
-        let num_unknown = self.springs.iter().filter(|c| **c == '?').count();
-        // println!("unknown: {}, combs: {}, list: {:?}", num_unknown, pow(2, num_unknown), unknown);
-
-        let mut all = vec![];
-        for i in 0..pow(2, num_unknown) {
-            let mut s = self.springs.clone();
-            for j in 0..num_unknown {
-                if (1 << j) & i == (1 << j) {
-                    s[unknown[j]] = '#';
-                } else {
-                    s[unknown[j]] = '.';
-                }
-            }
-            all.push(s);
-        }
-
-        // println!("{:?}", all);
-
-        let evals = all.iter().filter_map(Self::eval).filter(|v| {
-            if v.len() != self.config.len() {
-                return false;
-            }
-
-            v.iter().enumerate().all(|(i, v)| *v == self.config[i])
-        }).collect_vec();
-
-        // println!("{:?}", evals);
-
-        evals.len()
-    }
-
-    pub fn combinations(&self) -> Option<u32> {
-        Some(12)
+        Self { springs, config }
     }
 }
 
 #[aoc_generator(day12)]
 pub fn input_generator(input: &str) -> Result<Vec<SpringConfig>> {
-//     let input = "???.### 1,1,3
-// .??..??...?##. 1,1,3
-// ?#?#?#?#?#?#?#? 1,3,1,6
-// ????.#...#... 4,1,1
-// ????.######..#####. 1,6,5
-// ?###???????? 3,2,1";
     input
         .lines()
         .filter(|s| !s.is_empty())
+        .map(|s| s.trim())
         .map(SpringConfig::from_str)
         .collect::<Result<Vec<_>>>()
         .context("Error while parsing input")
@@ -135,16 +81,64 @@ pub fn input_generator(input: &str) -> Result<Vec<SpringConfig>> {
 
 #[aoc(day12, part1)]
 pub fn solve_part1(input: &[SpringConfig]) -> Result<usize> {
-    let result = input
+    Ok(input
         .iter()
-        .map(|s| s.brute_force())
-        .sum::<usize>();
-    Ok(result)
+        .map(|s| count_possible_solutions(s.springs.clone(), 0, s.config.clone()))
+        .sum::<usize>())
+}
+
+#[memoize]
+fn count_possible_solutions(springs: Vec<char>, matches: usize, config: Vec<usize>) -> usize {
+    if springs.is_empty() && matches == 0 && config.is_empty() {
+        return 1;
+    }
+
+    if springs.is_empty() && config.len() == 1 && matches == config[0] {
+        return 1;
+    }
+
+    if springs.is_empty() {
+        return 0;
+    }
+
+    if matches > 0 && config.is_empty() {
+        return 0;
+    }
+
+    match (springs[0], matches) {
+        ('?', 0) => {
+            count_possible_solutions(springs[1..].to_vec(), 1, config.clone())
+                + count_possible_solutions(springs[1..].to_vec(), 0, config.clone())
+        }
+        ('?', c) => {
+            let mut sub_count =
+                count_possible_solutions(springs[1..].to_vec(), c + 1, config.clone());
+            if c == config[0] {
+                sub_count +=
+                    count_possible_solutions(springs[1..].to_vec(), 0, config[1..].to_vec());
+            }
+            sub_count
+        }
+
+        ('#', 0) => count_possible_solutions(springs[1..].to_vec(), 1, config),
+        ('#', c) => count_possible_solutions(springs[1..].to_vec(), c + 1, config),
+
+        ('.', 0) => count_possible_solutions(springs[1..].to_vec(), 0, config),
+        ('.', x) if x != config[0] => 0,
+        ('.', _) => count_possible_solutions(springs[1..].to_vec(), 0, config[1..].to_vec()),
+
+        _ => panic!("No way"),
+    }
 }
 
 #[aoc(day12, part2)]
-pub fn solve_part2(input: &[SpringConfig]) -> Result<u32> {
-    Ok(0)
+pub fn solve_part2(input: &[SpringConfig]) -> Result<usize> {
+    let result = input
+        .iter()
+        .map(|s| s.unfold())
+        .map(|s| count_possible_solutions(s.springs.clone(), 0, s.config.to_vec()))
+        .sum::<usize>();
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -152,7 +146,12 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "???.### 1,1,3
+.??..??...?##. 1,1,3
+?#?#?#?#?#?#?#? 1,3,1,6
+????.#...#... 4,1,1
+????.######..#####. 1,6,5
+?###???????? 3,2,1"
     }
 
     fn input() -> Result<Vec<SpringConfig>> {
@@ -162,12 +161,12 @@ mod test {
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(21, solve_part1(&data)?))
     }
 
     #[test]
     fn part2_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
+        Ok(assert_eq!(525152, solve_part2(&data)?))
     }
 }
