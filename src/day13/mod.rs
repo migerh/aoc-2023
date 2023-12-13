@@ -4,6 +4,11 @@ use std::{str::FromStr, cmp::max};
 
 use crate::utils::AocError::*;
 
+pub enum Mirror {
+    Horizontal(usize),
+    Vertical(usize),
+}
+
 #[derive(Debug)]
 pub struct Map {
     data: Vec<Vec<char>>,
@@ -87,12 +92,16 @@ impl Map {
         line
     }
 
-    fn find_mirror(&self) -> Option<usize> {
+    fn find_mirror(&self) -> Option<Mirror> {
         if let Some(v) = Self::compare(&self.data, &Self::extract_horizontal, &Self::size_horizontal) {
-            return Some((v + 1) * 100);
+            return Some(Mirror::Horizontal(v + 1));
         }
 
-        Self::compare(&self.data, &Self::extract_vertical, &Self::size_vertical).map(|x| x + 1)
+        Self::compare(&self.data, &Self::extract_vertical, &Self::size_vertical).map(|x| Mirror::Vertical(x + 1))
+    }
+
+    fn smudge(&self) -> Option<usize> {
+        None
     }
 }
 
@@ -123,7 +132,12 @@ pub fn input_generator(input: &str) -> Result<Vec<Map>> {
 
 #[aoc(day13, part1)]
 pub fn solve_part1(input: &[Map]) -> Result<usize> {
-    let result = input.iter().map(|m| m.find_mirror()).collect::<Option<Vec<_>>>().ok_or(GenericError).context("One or more did not have mirrors")?.iter().sum();
+    let mirrors = input.iter().map(|m| m.find_mirror()).collect::<Option<Vec<_>>>().ok_or(GenericError).context("One or more did not have mirrors")?;
+    let result = mirrors.iter().map(|m| match m {
+        Mirror::Horizontal(v) => *v * 100,
+        Mirror::Vertical(v) => *v,
+    }).sum();
+
     Ok(result)
 }
 
