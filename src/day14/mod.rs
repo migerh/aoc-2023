@@ -1,6 +1,4 @@
-use anyhow::{Context, Error, Result};
-use itertools::Itertools;
-use std::str::FromStr;
+use anyhow::{Context, Result};
 
 use crate::utils::AocError::*;
 
@@ -26,22 +24,12 @@ impl Tile {
 
 #[aoc_generator(day14)]
 pub fn input_generator(input: &str) -> Result<Vec<Vec<Tile>>> {
-//     let input = "O....#....
-// O.OO#....#
-// .....##...
-// OO.#O....O
-// .O.....O#.
-// O.#..O.#.#
-// ..O..#O..O
-// .......O..
-// #....###..
-// #OO..#....";
     input
         .lines()
         .filter(|s| !s.is_empty())
         .map(|l| {
             l.chars()
-                .map(|c| Ok(Tile::from_char(c)?))
+                .map(Tile::from_char)
                 .collect::<Result<Vec<_>>>()
         })
         .collect::<Result<Vec<_>>>()
@@ -162,56 +150,50 @@ fn cycle(dish: &[Vec<Tile>]) -> Vec<Vec<Tile>> {
     dish
 }
 
-fn print(dish: &[Vec<Tile>]) {
-    dish.iter().for_each(|l| {
-        let l = l
-            .iter()
-            .map(|r| match r {
-                Tile::RoundRock => 'O',
-                Tile::CubeRock => '#',
-                Tile::Empty => '.',
-            })
-            .join("");
-        println!("{}", l)
-    });
+fn matches(haystack: &[usize], offset: usize, cycle_size: usize) -> bool {
+    (0..cycle_size).all(|i| {
+        haystack[offset + i] == haystack[offset + cycle_size + i]
+            && haystack[offset + i] == haystack[offset + 2 * cycle_size + i]
+    })
 }
 
 #[aoc(day14, part2)]
 pub fn solve_part2(input: &[Vec<Tile>]) -> Result<usize> {
-    // let reps = 1_000_000_000;
-    let reps = 200;
+    let reps = 250;
     let mut evals = vec![];
     (0..reps).fold(input.to_vec(), |acc, _| {
         evals.push(eval(&acc));
         cycle(&acc)
     });
 
-    // determined manually
-    let offset = 122;
-    let cycle_size = 18;
+    let mut offset = None;
+    let mut cycle_size = None;
 
-    // let offset = 3;
-    // let cycle_size = 7;
+    // increase offset
+    'outer: for off in 0..150 {
+        for cyc in 3..25 {
+            if matches(&evals, off, cyc) {
+                offset = Some(off);
+                cycle_size = Some(cyc);
+                break 'outer;
+            }
+        }
+    }
 
-    let rest = (1_000_000_000 - offset) % cycle_size;
-    let result = *evals.iter().skip(offset).skip(rest).next().ok_or(GenericError).context("Could not find result")?;
+    match (offset, cycle_size) {
+        (Some(offset), Some(cycle_size)) => {
+            let rest = (1_000_000_000 - offset) % cycle_size;
+            let result = *evals
+                .iter()
+                .skip(offset)
+                .nth(rest)
+                .ok_or(GenericError)
+                .context("Could not find result")?;
 
-
-    // let mut offset = 0;
-    // let mut first = 0;
-    // // increase offset
-    // for off in 0..200 {
-    //     let candidate = evals[off];
-    //     let others = evals.iter().filter(|e| **e == candidate).count();
-    //     if others > 0 {
-    //         first = candidate;
-    //         offset = off;
-    //     }
-    // }
-
-    // let cycle_size = evals.iter().skip(offset + 1).find_position(|e| first == **e).ok_or(GenericError).context("Could not find cycle")?.0;
-
-    Ok(result)
+            Ok(result)
+        }
+        _ => Err(GenericError).context("Could not find cycle")?,
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +201,16 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "O....#....
+O.OO#....#
+.....##...
+OO.#O....O
+.O.....O#.
+O.#..O.#.#
+..O..#O..O
+.......O..
+#....###..
+#OO..#...."
     }
 
     fn input() -> Result<Vec<Vec<Tile>>> {
@@ -229,12 +220,12 @@ mod test {
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(136, solve_part1(&data)?))
     }
 
     #[test]
     fn part2_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
+        Ok(assert_eq!(64, solve_part2(&data)?))
     }
 }
