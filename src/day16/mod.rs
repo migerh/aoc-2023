@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use itertools::Itertools;
+use rayon::prelude::*;
 use std::{cmp::max, collections::HashSet};
 
 use crate::utils::AocError::*;
@@ -157,7 +158,7 @@ pub fn solve_part2(input: &[Vec<char>]) -> Result<usize> {
     let width = input[0].len() as isize;
     let height = input.len() as isize;
 
-    let max_x = (0..width)
+    let max_x = (0..width).into_par_iter()
         .map(|x| {
             let start_top = Beam::new((x, 0), Direction::Down);
             let mut path_top = Set::new();
@@ -177,7 +178,7 @@ pub fn solve_part2(input: &[Vec<char>]) -> Result<usize> {
         .ok_or(GenericError)
         .context("Could not find max item in x dir")?;
 
-    let max_y = (1..height - 1)
+    let max_y = (1..height - 1).into_par_iter()
         .map(|y| {
             let start_left = Beam::new((0, y), Direction::Right);
             let mut path_left = Set::new();
