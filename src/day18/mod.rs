@@ -1,7 +1,7 @@
 use anyhow::{Context, Error, Result};
 use itertools::{Itertools, MinMaxResult};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     str::FromStr,
 };
 
@@ -109,20 +109,6 @@ impl Instruction {
 
 #[aoc_generator(day18)]
 pub fn input_generator(input: &str) -> Result<Vec<Instruction>> {
-    let input = "R 6 (#70c710)
-D 5 (#0dc571)
-L 2 (#5713f0)
-D 2 (#d2c081)
-R 2 (#59c680)
-D 2 (#411b91)
-L 5 (#8ceee2)
-U 2 (#caa173)
-L 1 (#1b58a2)
-U 2 (#caa171)
-R 2 (#7807d2)
-U 3 (#a77fa3)
-L 2 (#015232)
-U 2 (#7a21e3)";
     input
         .lines()
         .filter(|s| !s.is_empty())
@@ -199,7 +185,6 @@ pub fn to_grid(map: &HashMap<Coords, Vec<String>>) -> Result<Vec<Vec<Tile>>> {
 }
 
 pub fn neighbors(
-    grid: &Vec<Vec<Tile>>,
     width: usize,
     height: usize,
     pos: (usize, usize),
@@ -240,7 +225,7 @@ pub fn fill_outside(grid: &mut Vec<Vec<Tile>>) -> Option<()> {
         }
 
         grid[p.1][p.0] = Tile::Outside;
-        let next = neighbors(grid, width, height, p);
+        let next = neighbors(width, height, p);
         for n in next {
             queue.push_back(n);
         }
@@ -258,21 +243,6 @@ pub fn solve_part1(input: &[Instruction]) -> Result<usize> {
         .ok_or(GenericError)
         .context("Could not fill")?;
 
-    for y in 0..grid.len() {
-        for x in 0..grid[y].len() {
-            print!(
-                "{}",
-                match grid[y][x] {
-                    Tile::Border => '#',
-                    Tile::Outside => ' ',
-                    Tile::Inside => '#',
-                    Tile::Unknown => '.',
-                }
-            );
-        }
-        println!();
-    }
-
     let height = grid.len();
     let width = grid
         .get(0)
@@ -287,105 +257,62 @@ pub fn solve_part1(input: &[Instruction]) -> Result<usize> {
     Ok(height * width - number_of_outside)
 }
 
-pub fn size(map: &HashMap<Coords, Vec<String>>) -> Result<(isize, isize, usize, usize)> {
-    let minmax_x = match map.iter().map(|(k, _)| k.0).minmax() {
-        MinMaxResult::MinMax(x, y) => (x, y),
-        _ => Err(GenericError).context("min max x")?,
-    };
-    let minmax_y = match map.iter().map(|(k, _)| k.1).minmax() {
-        MinMaxResult::MinMax(x, y) => (x, y),
-        _ => Err(GenericError).context("min max y")?,
-    };
+pub fn trace_corners(instr: &[Instruction], start: &Coords) -> (Vec<Coords>, isize) {
+    use Direction::*;
 
-    let width = minmax_x.1 - minmax_x.0 + 1 + 2;
-    let height = minmax_y.1 - minmax_y.0 + 1 + 2;
+    let mut pos = *start;
+    let mut corners = vec![pos];
+    let mut border = 0;
 
-    Ok((
-        minmax_x.0 - 1,
-        minmax_y.0 - 1,
-        width as usize,
-        height as usize,
-    ))
-}
-pub fn neighbors_map(
-    offset_x: isize,
-    offset_y: isize,
-    width: usize,
-    height: usize,
-    pos: Coords,
-) -> Vec<Coords> {
-    let width = width as isize;
-    let height = height as isize;
-
-    let mut result = vec![];
-
-    if pos.0 > offset_x {
-        result.push((pos.0 - 1, pos.1));
+    for i in instr.iter() {
+        let len = i.len as isize;
+        pos = match i.dir {
+            Up => (pos.0, pos.1 - len),
+            Right => (pos.0 + len, pos.1),
+            Down => (pos.0, pos.1 + len),
+            Left => (pos.0 - len, pos.1),
+        };
+        corners.push(pos);
+        border += len;
     }
 
-    if pos.0 < width - 1 {
-        result.push((pos.0 + 1, pos.1));
-    }
-
-    if pos.1 > offset_y {
-        result.push((pos.0, pos.1 - 1));
-    }
-
-    if pos.1 < height - 1 {
-        result.push((pos.0, pos.1 + 1));
-    }
-
-    result
+    (corners, border)
 }
 
-pub fn fill_map_outside(
-    map: &mut HashMap<Coords, Tile>,
-    offset_x: isize,
-    offset_y: isize,
-    width: usize,
-    height: usize,
-) -> Option<()> {
-    let start = (offset_x, offset_y);
-    let mut queue = VecDeque::new();
-    queue.push_back(start);
+pub fn shoelace(corners: &[Coords]) -> Option<isize> {
+    let mut sum = corners
+        .windows(2)
+        .map(|c| {
+            c[0].0 * c[1].1 - c[0].1 * c[1].0
+        })
+        .sum::<isize>();
+    let first = corners.first()?;
+    let last = corners.last()?;
 
-    while let Some(p) = queue.pop_front() {
-        let tile = map.get(&p).unwrap_or(&Tile::Unknown).clone();
-        if tile == Tile::Outside || tile == Tile::Border {
-            continue;
-        }
+    sum += last.0 * first.1 - last.1 * first.0;
 
-        map.entry(p)
-            .and_modify(|t| *t = Tile::Outside)
-            .or_insert(Tile::Outside);
-        let next = neighbors_map(offset_x, offset_y, width, height, p);
-        for n in next {
-            queue.push_back(n);
-        }
-    }
-
-    Some(())
+    Some((sum / 2).abs())
 }
 
 #[aoc(day18, part2)]
-pub fn solve_part2(input: &[Instruction]) -> Result<usize> {
+pub fn solve_part2(input: &[Instruction]) -> Result<isize> {
     let input = input
         .iter()
         .map(|i| i.part2())
         .collect::<Result<Vec<_>>>()?;
 
-    let map = trace(&input, (0, 0))?;
-    let (offset_x, offset_y, width, height) = size(&map)?;
-    println!("{}, {} -> {}, {}", offset_x, offset_y, width, height);
-    let mut map = map
-        .keys()
-        .map(|k| (*k, Tile::Border))
-        .collect::<HashMap<Coords, Tile>>();
+    let (corners, border_length) = trace_corners(&input, &(0, 0));
+    let result = shoelace(&corners)
+        .ok_or(GenericError)
+        .context("Unable to determine area")?;
 
-    fill_map_outside(&mut map, offset_x, offset_y, width, height).ok_or(GenericError).context("Could not fill map")?;
-    let number_outside = map.iter().filter(|(_, v)| **v == Tile::Outside).count();
-
-    Ok(height * width - number_outside)
+    // I have no idea what's happening here. I ran the example and saw the
+    // initial result without the border and it was below what is expected.
+    // So I added the border length, to see if it helps and now I'm above
+    // the expected number. But both my results had roughly the same distance
+    // to the expected result so I halved my result. Now it was only one off,
+    // ran it on my input and it worked ¯\_(ツ)_/¯
+    Ok(result + border_length / 2 + 1)
 }
 
 #[cfg(test)]
@@ -393,7 +320,20 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "R 6 (#70c710)
+D 5 (#0dc571)
+L 2 (#5713f0)
+D 2 (#d2c081)
+R 2 (#59c680)
+D 2 (#411b91)
+L 5 (#8ceee2)
+U 2 (#caa173)
+L 1 (#1b58a2)
+U 2 (#caa171)
+R 2 (#7807d2)
+U 3 (#a77fa3)
+L 2 (#015232)
+U 2 (#7a21e3)"
     }
 
     fn input() -> Result<Vec<Instruction>> {
@@ -403,12 +343,12 @@ mod test {
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(62, solve_part1(&data)?))
     }
 
     #[test]
     fn part2_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
+        Ok(assert_eq!(952408144115, solve_part2(&data)?))
     }
 }
