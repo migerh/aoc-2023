@@ -9,11 +9,12 @@ use crate::utils::AocError::*;
 
 type Coords = (isize, isize);
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub enum Tile {
     Inside,
     Outside,
     Border,
+    #[default]
     Unknown,
 }
 
@@ -108,20 +109,20 @@ impl Instruction {
 
 #[aoc_generator(day18)]
 pub fn input_generator(input: &str) -> Result<Vec<Instruction>> {
-//     let input = "R 6 (#70c710)
-// D 5 (#0dc571)
-// L 2 (#5713f0)
-// D 2 (#d2c081)
-// R 2 (#59c680)
-// D 2 (#411b91)
-// L 5 (#8ceee2)
-// U 2 (#caa173)
-// L 1 (#1b58a2)
-// U 2 (#caa171)
-// R 2 (#7807d2)
-// U 3 (#a77fa3)
-// L 2 (#015232)
-// U 2 (#7a21e3)";
+    let input = "R 6 (#70c710)
+D 5 (#0dc571)
+L 2 (#5713f0)
+D 2 (#d2c081)
+R 2 (#59c680)
+D 2 (#411b91)
+L 5 (#8ceee2)
+U 2 (#caa173)
+L 1 (#1b58a2)
+U 2 (#caa171)
+R 2 (#7807d2)
+U 3 (#a77fa3)
+L 2 (#015232)
+U 2 (#7a21e3)";
     input
         .lines()
         .filter(|s| !s.is_empty())
@@ -286,6 +287,86 @@ pub fn solve_part1(input: &[Instruction]) -> Result<usize> {
     Ok(height * width - number_of_outside)
 }
 
+pub fn size(map: &HashMap<Coords, Vec<String>>) -> Result<(isize, isize, usize, usize)> {
+    let minmax_x = match map.iter().map(|(k, _)| k.0).minmax() {
+        MinMaxResult::MinMax(x, y) => (x, y),
+        _ => Err(GenericError).context("min max x")?,
+    };
+    let minmax_y = match map.iter().map(|(k, _)| k.1).minmax() {
+        MinMaxResult::MinMax(x, y) => (x, y),
+        _ => Err(GenericError).context("min max y")?,
+    };
+
+    let width = minmax_x.1 - minmax_x.0 + 1 + 2;
+    let height = minmax_y.1 - minmax_y.0 + 1 + 2;
+
+    Ok((
+        minmax_x.0 - 1,
+        minmax_y.0 - 1,
+        width as usize,
+        height as usize,
+    ))
+}
+pub fn neighbors_map(
+    offset_x: isize,
+    offset_y: isize,
+    width: usize,
+    height: usize,
+    pos: Coords,
+) -> Vec<Coords> {
+    let width = width as isize;
+    let height = height as isize;
+
+    let mut result = vec![];
+
+    if pos.0 > offset_x {
+        result.push((pos.0 - 1, pos.1));
+    }
+
+    if pos.0 < width - 1 {
+        result.push((pos.0 + 1, pos.1));
+    }
+
+    if pos.1 > offset_y {
+        result.push((pos.0, pos.1 - 1));
+    }
+
+    if pos.1 < height - 1 {
+        result.push((pos.0, pos.1 + 1));
+    }
+
+    result
+}
+
+pub fn fill_map_outside(
+    map: &mut HashMap<Coords, Tile>,
+    offset_x: isize,
+    offset_y: isize,
+    width: usize,
+    height: usize,
+) -> Option<()> {
+    let start = (offset_x, offset_y);
+    let mut queue = VecDeque::new();
+    queue.push_back(start);
+
+    while let Some(p) = queue.pop_front() {
+        let tile = map.get(&p).unwrap_or(&Tile::Unknown).clone();
+        if tile == Tile::Outside || tile == Tile::Border {
+            continue;
+        }
+
+        map.entry(p)
+            .and_modify(|t| *t = Tile::Outside)
+            .or_insert(Tile::Outside);
+        let next = neighbors_map(offset_x, offset_y, width, height, p);
+        for n in next {
+            queue.push_back(n);
+        }
+    }
+
+    Some(())
+}
+
 #[aoc(day18, part2)]
 pub fn solve_part2(input: &[Instruction]) -> Result<usize> {
     let input = input
@@ -294,24 +375,17 @@ pub fn solve_part2(input: &[Instruction]) -> Result<usize> {
         .collect::<Result<Vec<_>>>()?;
 
     let map = trace(&input, (0, 0))?;
-    let mut grid = to_grid(&map)?;
+    let (offset_x, offset_y, width, height) = size(&map)?;
+    println!("{}, {} -> {}, {}", offset_x, offset_y, width, height);
+    let mut map = map
+        .keys()
+        .map(|k| (*k, Tile::Border))
+        .collect::<HashMap<Coords, Tile>>();
 
-    fill_outside(&mut grid)
-        .ok_or(GenericError)
-        .context("Could not fill")?;
+    fill_map_outside(&mut map, offset_x, offset_y, width, height).ok_or(GenericError).context("Could not fill map")?;
+    let number_outside = map.iter().filter(|(_, v)| **v == Tile::Outside).count();
 
-    let height = grid.len();
-    let width = grid
-        .get(0)
-        .ok_or(GenericError)
-        .context("grid is empty")?
-        .len();
-    let number_of_outside = grid
-        .iter()
-        .map(|r| r.iter().filter(|t| **t == Tile::Outside).count())
-        .sum::<usize>();
-
-    Ok(height * width - number_of_outside)
+    Ok(height * width - number_outside)
 }
 
 #[cfg(test)]
