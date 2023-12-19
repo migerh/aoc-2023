@@ -1,6 +1,6 @@
 use anyhow::{Context, Error, Result};
 use itertools::Itertools;
-use std::{str::FromStr, collections::HashMap};
+use std::{collections::HashMap, str::FromStr};
 
 use crate::utils::AocError::*;
 
@@ -9,7 +9,7 @@ pub struct Part {
     x: u64,
     m: u64,
     a: u64,
-    s: u64
+    s: u64,
 }
 
 impl FromStr for Part {
@@ -18,7 +18,8 @@ impl FromStr for Part {
     fn from_str(s: &str) -> Result<Self> {
         lazy_static! {
             static ref RE: regex::Regex =
-                regex::Regex::new(r"^\{x=(?P<x>\d+),m=(?P<m>\d+?),a=(?P<a>\d+?),s=(?P<s>\d+?)\}$").unwrap();
+                regex::Regex::new(r"^\{x=(?P<x>\d+),m=(?P<m>\d+?),a=(?P<a>\d+?),s=(?P<s>\d+?)\}$")
+                    .unwrap();
         }
 
         let (x, m, a, s) = RE
@@ -95,23 +96,21 @@ impl FromStr for Rule {
 
     fn from_str(s: &str) -> Result<Self> {
         lazy_static! {
-            static ref CHECK: regex::Regex =
-                regex::Regex::new(r"^(?P<property>[xmas])(?P<compare>[<>])(?P<num>\d+?):(?P<next>\w+?)$").unwrap();
-            static ref FALLBACK: regex::Regex =
-                regex::Regex::new(r"^(?P<next>\w+?)$").unwrap();
+            static ref CHECK: regex::Regex = regex::Regex::new(
+                r"^(?P<property>[xmas])(?P<compare>[<>])(?P<num>\d+?):(?P<next>\w+?)$"
+            )
+            .unwrap();
+            static ref FALLBACK: regex::Regex = regex::Regex::new(r"^(?P<next>\w+?)$").unwrap();
         }
 
-        if let Some((property, compare, num, next)) = CHECK
-            .captures(s)
-            .and_then(|cap| {
-                let property = cap.name("property").map(|v| v.as_str())?.to_string();
-                let compare = cap.name("compare").map(|v| v.as_str())?.to_string();
-                let num = cap.name("num").map(|v| v.as_str())?.to_string();
-                let next = cap.name("next").map(|v| v.as_str())?.to_string();
+        if let Some((property, compare, num, next)) = CHECK.captures(s).and_then(|cap| {
+            let property = cap.name("property").map(|v| v.as_str())?.to_string();
+            let compare = cap.name("compare").map(|v| v.as_str())?.to_string();
+            let num = cap.name("num").map(|v| v.as_str())?.to_string();
+            let next = cap.name("next").map(|v| v.as_str())?.to_string();
 
-                Some((property, compare, num, next))
-            }) {
-
+            Some((property, compare, num, next))
+        }) {
             let property = Property::from_str(&property)?;
             let num = num.parse::<u64>()?;
             let next = Next::from_str(&next)?;
@@ -130,13 +129,13 @@ impl FromStr for Rule {
                     let next = cap.name("next").map(|v| v.as_str())?.to_string();
 
                     Some(next)
-                }).context("Could not parse fallback")?;
+                })
+                .context("Could not parse fallback")?;
 
             let next = Next::from_str(&next)?;
 
             Ok(Rule::Else(next))
         }
-
     }
 }
 
@@ -165,7 +164,10 @@ impl FromStr for Workflow {
             })
             .context("Error during parse")?;
 
-        let rules = rules.split(",").map(Rule::from_str).collect::<Result<Vec<_>>>()?;
+        let rules = rules
+            .split(",")
+            .map(Rule::from_str)
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Workflow { id, rules })
     }
@@ -173,28 +175,37 @@ impl FromStr for Workflow {
 
 #[aoc_generator(day19)]
 pub fn input_generator(input: &str) -> Result<(Vec<Workflow>, Vec<Part>)> {
-//     let input = "px{a<2006:qkq,m>2090:A,rfg}
-// pv{a>1716:R,A}
-// lnx{m>1548:A,A}
-// rfg{s<537:gd,x>2440:R,A}
-// qs{s>3448:A,lnx}
-// qkq{x<1416:A,crn}
-// crn{x>2662:A,R}
-// in{s<1351:px,qqz}
-// qqz{s>2770:qs,m<1801:hdj,R}
-// gd{a>3333:R,R}
-// hdj{m>838:A,pv}
-// 
-// {x=787,m=2655,a=1222,s=2876}
-// {x=1679,m=44,a=2067,s=496}
-// {x=2036,m=264,a=79,s=2244}
-// {x=2461,m=1339,a=466,s=291}
-// {x=2127,m=1623,a=2188,s=1013}";
-    let mut split = input
-        .split("\n\n");
+    let input = "px{a<2006:qkq,m>2090:A,rfg}
+pv{a>1716:R,A}
+lnx{m>1548:A,A}
+rfg{s<537:gd,x>2440:R,A}
+qs{s>3448:A,lnx}
+qkq{x<1416:A,crn}
+crn{x>2662:A,R}
+in{s<1351:px,qqz}
+qqz{s>2770:qs,m<1801:hdj,R}
+gd{a>3333:R,R}
+hdj{m>838:A,pv}
 
-    let workflows = split.next().context("No workflows")?.lines().map(Workflow::from_str).collect::<Result<Vec<_>>>()?;
-    let parts = split.next().context("No parts")?.lines().map(Part::from_str).collect::<Result<Vec<_>>>()?;
+{x=787,m=2655,a=1222,s=2876}
+{x=1679,m=44,a=2067,s=496}
+{x=2036,m=264,a=79,s=2244}
+{x=2461,m=1339,a=466,s=291}
+{x=2127,m=1623,a=2188,s=1013}";
+    let mut split = input.split("\n\n");
+
+    let workflows = split
+        .next()
+        .context("No workflows")?
+        .lines()
+        .map(Workflow::from_str)
+        .collect::<Result<Vec<_>>>()?;
+    let parts = split
+        .next()
+        .context("No parts")?
+        .lines()
+        .map(Part::from_str)
+        .collect::<Result<Vec<_>>>()?;
 
     Ok((workflows, parts))
 }
@@ -203,24 +214,20 @@ impl Rule {
     pub fn next(&self, part: &Part) -> Option<&Next> {
         println!("Checking {:?} against {:?}", part, self);
         match self {
-            Rule::Greater(prop, num, next) => {
-                match prop {
-                    Property::X if part.x > *num => Some(next),
-                    Property::M if part.m > *num => Some(next),
-                    Property::A if part.a > *num => Some(next),
-                    Property::S if part.s > *num => Some(next),
-                    _ => None,
-                }
+            Rule::Greater(prop, num, next) => match prop {
+                Property::X if part.x > *num => Some(next),
+                Property::M if part.m > *num => Some(next),
+                Property::A if part.a > *num => Some(next),
+                Property::S if part.s > *num => Some(next),
+                _ => None,
             },
-            Rule::Less(prop, num, next) => {
-                match prop {
-                    Property::X if part.x < *num => Some(next),
-                    Property::M if part.m < *num => Some(next),
-                    Property::A if part.a < *num => Some(next),
-                    Property::S if part.s < *num => Some(next),
-                    _ => None,
-                }
-            }
+            Rule::Less(prop, num, next) => match prop {
+                Property::X if part.x < *num => Some(next),
+                Property::M if part.m < *num => Some(next),
+                Property::A if part.a < *num => Some(next),
+                Property::S if part.s < *num => Some(next),
+                _ => None,
+            },
             Rule::Else(n) => Some(n),
         }
     }
@@ -246,8 +253,8 @@ impl Part {
                             Next::Accept => return true,
                             Next::Reject => {
                                 println!("Straight up reject");
-                                return false
-                            },
+                                return false;
+                            }
                             Next::Workflow(wf) => {
                                 println!("Next workflow {:?}", wf);
                                 if let Some(w) = workflows.get(wf) {
@@ -272,13 +279,22 @@ impl Part {
 #[aoc(day19, part1)]
 pub fn solve_part1(input: &(Vec<Workflow>, Vec<Part>)) -> Result<u64> {
     let (workflows, parts) = input;
-    let workflows = workflows.iter().cloned().map(|w| (w.id.clone(), w)).collect::<HashMap<String, Workflow>>();
+    let workflows = workflows
+        .iter()
+        .cloned()
+        .map(|w| (w.id.clone(), w))
+        .collect::<HashMap<String, Workflow>>();
 
-    let rating = parts.iter().filter_map(|p| if p.is_accepted(&workflows) {
-        Some(p.rating())
-    } else {
-        None
-    }).sum();
+    let rating = parts
+        .iter()
+        .filter_map(|p| {
+            if p.is_accepted(&workflows) {
+                Some(p.rating())
+            } else {
+                None
+            }
+        })
+        .sum();
 
     Ok(rating)
 }
