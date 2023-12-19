@@ -1,5 +1,7 @@
 use anyhow::{Context, Error, Result};
 use itertools::Itertools;
+use num::iter::{Range, RangeInclusive};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::utils::AocError::*;
@@ -43,7 +45,7 @@ impl FromStr for Part {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Next {
     Accept,
     Reject,
@@ -175,23 +177,6 @@ impl FromStr for Workflow {
 
 #[aoc_generator(day19)]
 pub fn input_generator(input: &str) -> Result<(Vec<Workflow>, Vec<Part>)> {
-    let input = "px{a<2006:qkq,m>2090:A,rfg}
-pv{a>1716:R,A}
-lnx{m>1548:A,A}
-rfg{s<537:gd,x>2440:R,A}
-qs{s>3448:A,lnx}
-qkq{x<1416:A,crn}
-crn{x>2662:A,R}
-in{s<1351:px,qqz}
-qqz{s>2770:qs,m<1801:hdj,R}
-gd{a>3333:R,R}
-hdj{m>838:A,pv}
-
-{x=787,m=2655,a=1222,s=2876}
-{x=1679,m=44,a=2067,s=496}
-{x=2036,m=264,a=79,s=2244}
-{x=2461,m=1339,a=466,s=291}
-{x=2127,m=1623,a=2188,s=1013}";
     let mut split = input.split("\n\n");
 
     let workflows = split
@@ -210,9 +195,10 @@ hdj{m>838:A,pv}
     Ok((workflows, parts))
 }
 
+type RangeSplit = (Vec<Rang<i32>>, Vec<Rang<i32>>);
+
 impl Rule {
     pub fn next(&self, part: &Part) -> Option<&Next> {
-        println!("Checking {:?} against {:?}", part, self);
         match self {
             Rule::Greater(prop, num, next) => match prop {
                 Property::X if part.x > *num => Some(next),
@@ -231,6 +217,59 @@ impl Rule {
             Rule::Else(n) => Some(n),
         }
     }
+
+    fn restrict(ranges: &[Rang<i32>], which: usize, split: i32, greater: bool) -> Option<RangeSplit> {
+        let ranges = ranges.to_owned();
+        let range = &ranges[which];
+        if greater && split >= range.end {
+            return None;
+        }
+
+        if !greater && split <= range.start {
+            return None;
+        }
+
+
+        if greater {
+            let mut invalid = ranges.clone();
+            invalid[which].start = ranges[which].start;
+            invalid[which].end = split;
+
+            let mut valid = ranges.clone();
+            valid[which].start = split + 1;
+            valid[which].end = ranges[which].end;
+
+            return Some((valid, invalid));
+        }
+
+        let mut valid = ranges.clone();
+        valid[which].start = ranges[which].start;
+        valid[which].end = split - 1;
+
+        let mut invalid = ranges.clone();
+        invalid[which].start = split;
+        invalid[which].end = ranges[which].end;
+
+        Some((valid, invalid))
+    }
+
+    pub fn split(&self, ranges: &Vec<Rang<i32>>) -> (Option<RangeSplit>, &Next) {
+        match self {
+            Rule::Greater(prop, num, next) => match prop {
+                Property::X => (Self::restrict(ranges, 0, *num as i32, true), next),
+                Property::M => (Self::restrict(ranges, 1, *num as i32, true), next),
+                Property::A => (Self::restrict(ranges, 2, *num as i32, true), next),
+                Property::S => (Self::restrict(ranges, 3, *num as i32, true), next),
+            },
+            Rule::Less(prop, num, next) => match prop {
+                Property::X => (Self::restrict(ranges, 0, *num as i32, false), next),
+                Property::M => (Self::restrict(ranges, 1, *num as i32, false), next),
+                Property::A => (Self::restrict(ranges, 2, *num as i32, false), next),
+                Property::S => (Self::restrict(ranges, 3, *num as i32, false), next),
+            },
+            Rule::Else(n) => (None, n),
+        }
+    }
 }
 
 impl Part {
@@ -238,30 +277,29 @@ impl Part {
         self.x + self.m + self.a + self.s
     }
 
+    pub fn combinations(&self) -> u128 {
+        let x = self.x as u128;
+        let m = self.m as u128;
+        let a = self.a as u128;
+        let s = self.s as u128;
+        x * m * a * s
+    }
+
     pub fn is_accepted(&self, workflows: &HashMap<String, Workflow>) -> bool {
-        println!("checking {:?}", self);
         if let Some(in_workflow) = workflows.get("in") {
             let mut workflow = in_workflow.clone();
 
             loop {
-                println!();
-                println!("workflow: {}", workflow.id);
                 for rule in workflow.rules.clone() {
-                    println!("Rule {:?}", rule);
                     if let Some(next) = rule.next(self) {
                         match next {
                             Next::Accept => return true,
-                            Next::Reject => {
-                                println!("Straight up reject");
-                                return false;
-                            }
+                            Next::Reject => return false,
                             Next::Workflow(wf) => {
-                                println!("Next workflow {:?}", wf);
                                 if let Some(w) = workflows.get(wf) {
                                     workflow = w.clone();
                                     break;
                                 } else {
-                                    println!("Workflow {} not found", wf);
                                     return false;
                                 }
                             }
@@ -299,9 +337,75 @@ pub fn solve_part1(input: &(Vec<Workflow>, Vec<Part>)) -> Result<u64> {
     Ok(rating)
 }
 
+#[derive(Debug, Clone)]
+pub struct Rang<T> {
+    pub start: T,
+    pub end: T,
+}
+
+impl<T> Rang<T> {
+    pub fn new(start: T, end: T) -> Self {
+        Self { start, end }
+    }
+}
+
+fn prod(ranges: &[Rang<i32>]) -> u128 {
+    ranges.iter().map(|r| (r.end - r.start + 1) as u128).product()
+}
+
+pub fn trace(workflows: &HashMap<String, Workflow>, workflow: &Workflow, ranges: &[Rang<i32>]) -> u128 {
+    let mut sum = 0;
+    let mut ranges = ranges.to_vec().clone();
+
+    for rule in &workflow.rules {
+        let (split, next) = rule.split(&ranges);
+
+        if let Some(split) = split {
+            if *next == Next::Accept {
+                sum += prod(&split.0);
+            }
+
+            if *next == Next::Reject {
+                sum += 0;
+            }
+
+            if let Next::Workflow(next) = next {
+                let next_wf = workflows.get(next).unwrap();
+                sum += trace(workflows, next_wf, &split.0);
+            }
+
+            ranges = split.1;
+        } else {
+            if *next == Next::Accept {
+                sum += prod(&ranges);
+            }
+
+            if *next == Next::Reject {
+                sum += 0;
+            }
+
+            if let Next::Workflow(next) = next {
+                let next_wf = workflows.get(next).unwrap();
+                sum += trace(workflows, next_wf, &ranges);
+            }
+        }
+    }
+
+    sum
+}
+
 #[aoc(day19, part2)]
-pub fn solve_part2(input: &(Vec<Workflow>, Vec<Part>)) -> Result<u32> {
-    Ok(0)
+pub fn solve_part2(input: &(Vec<Workflow>, Vec<Part>)) -> Result<u128> {
+    let (workflows, _) = input;
+    let workflows = workflows
+        .iter()
+        .cloned()
+        .map(|w| (w.id.clone(), w))
+        .collect::<HashMap<String, Workflow>>();
+
+    let start = workflows.get("in").context("No workflow named in")?;
+    let ranges= vec![Rang::new(1, 4000), Rang::new(1, 4000), Rang::new(1, 4000), Rang::new(1, 4000)];
+    Ok(trace(&workflows, start, &ranges))
 }
 
 #[cfg(test)]
@@ -309,22 +413,38 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "px{a<2006:qkq,m>2090:A,rfg}
+pv{a>1716:R,A}
+lnx{m>1548:A,A}
+rfg{s<537:gd,x>2440:R,A}
+qs{s>3448:A,lnx}
+qkq{x<1416:A,crn}
+crn{x>2662:A,R}
+in{s<1351:px,qqz}
+qqz{s>2770:qs,m<1801:hdj,R}
+gd{a>3333:R,R}
+hdj{m>838:A,pv}
+
+{x=787,m=2655,a=1222,s=2876}
+{x=1679,m=44,a=2067,s=496}
+{x=2036,m=264,a=79,s=2244}
+{x=2461,m=1339,a=466,s=291}
+{x=2127,m=1623,a=2188,s=1013}"
     }
 
-    fn input() -> Result<Vec<Part>> {
+    fn input() -> Result<(Vec<Workflow>, Vec<Part>)> {
         input_generator(sample())
     }
 
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(19114, solve_part1(&data)?))
     }
 
     #[test]
     fn part2_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
+        Ok(assert_eq!(167409079868000, solve_part2(&data)?))
     }
 }
