@@ -1,7 +1,4 @@
 use anyhow::{Context, Error, Result};
-use itertools::Itertools;
-use num::iter::{Range, RangeInclusive};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::utils::AocError::*;
@@ -167,7 +164,7 @@ impl FromStr for Workflow {
             .context("Error during parse")?;
 
         let rules = rules
-            .split(",")
+            .split(',')
             .map(Rule::from_str)
             .collect::<Result<Vec<_>>>()?;
 
@@ -253,7 +250,7 @@ impl Rule {
         Some((valid, invalid))
     }
 
-    pub fn split(&self, ranges: &Vec<Rang<i32>>) -> (Option<RangeSplit>, &Next) {
+    pub fn split(&self, ranges: &[Rang<i32>]) -> (Option<RangeSplit>, &Next) {
         match self {
             Rule::Greater(prop, num, next) => match prop {
                 Property::X => (Self::restrict(ranges, 0, *num as i32, true), next),
@@ -309,8 +306,7 @@ impl Part {
             }
         }
 
-        println!("Ran out of rules?");
-        false
+        unreachable!("Ran out of rules?")
     }
 }
 
