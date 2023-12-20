@@ -1,11 +1,8 @@
 use anyhow::{Context, Error, Result};
-use itertools::Itertools;
 use std::{
     collections::{HashMap, VecDeque},
     str::FromStr,
 };
-
-use crate::utils::AocError::*;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Signal {
@@ -48,7 +45,7 @@ impl FromStr for FlipFlop {
 }
 
 impl Module for FlipFlop {
-    fn process(&mut self, from: &str, signal: Signal) -> (String, Vec<String>, Signal) {
+    fn process(&mut self, _from: &str, signal: Signal) -> (String, Vec<String>, Signal) {
         if signal == Signal::Low {
             self.on = !self.on;
             (
@@ -137,7 +134,7 @@ impl FromStr for Button {
 }
 
 impl Module for Button {
-    fn process(&mut self, from: &str, signal: Signal) -> (String, Vec<String>, Signal) {
+    fn process(&mut self, _from: &str, signal: Signal) -> (String, Vec<String>, Signal) {
         (self.name.clone(), self.output.clone(), signal)
     }
 }
@@ -146,27 +143,17 @@ impl Module for Button {
 pub struct Output;
 
 impl Module for Output {
-    fn process(&mut self, from: &str, signal: Signal) -> (String, Vec<String>, Signal) {
+    fn process(&mut self, _from: &str, _signal: Signal) -> (String, Vec<String>, Signal) {
         ("output".to_string(), vec![], Signal::Low)
     }
 }
 
 #[aoc_generator(day20)]
 pub fn input_generator(input: &str) -> Result<Machine> {
-    //     let input = "broadcaster -> a, b, c
-    // %a -> b
-    // %b -> c
-    // %c -> inv
-    // &inv -> a";
-    //     let input = "broadcaster -> a
-    // %a -> inv, con
-    // &inv -> b
-    // %b -> con
-    // &con -> output";
     let buttons = input
         .lines()
         .filter(|s| !s.is_empty())
-        .filter(|l| !l.starts_with("%") && !l.starts_with("&"))
+        .filter(|l| !l.starts_with('%') && !l.starts_with('&'))
         .map(Button::from_str)
         .collect::<Result<Vec<_>>>()
         .context("Error while parsing input")?;
@@ -174,7 +161,7 @@ pub fn input_generator(input: &str) -> Result<Machine> {
     let flipflop = input
         .lines()
         .filter(|s| !s.is_empty())
-        .filter(|l| l.starts_with("%"))
+        .filter(|l| l.starts_with('%'))
         .map(FlipFlop::from_str)
         .collect::<Result<Vec<_>>>()
         .context("Error while parsing input")?;
@@ -182,7 +169,7 @@ pub fn input_generator(input: &str) -> Result<Machine> {
     let mut conjunction = input
         .lines()
         .filter(|s| !s.is_empty())
-        .filter(|l| l.starts_with("&"))
+        .filter(|l| l.starts_with('&'))
         .map(Conjunction::from_str)
         .collect::<Result<Vec<_>>>()
         .context("Error while parsing input")?;
