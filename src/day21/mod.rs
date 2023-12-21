@@ -128,9 +128,17 @@ fn size(map: &Map) -> Result<Coords> {
     Ok((max_x + 1, max_y + 1))
 }
 
+fn diff_at(steps: usize, diffs: &Vec<usize>, offsets: &Vec<usize>) -> usize {
+    let start = 42;
+    let cycle = 11;
+
+    let observe = (steps - start) - (steps - start) % cycle;
+    (observe / cycle) * diffs[(steps - start) % cycle] + offsets[(steps - start) % cycle]
+}
+
 #[aoc(day21, part2)]
 pub fn solve_part2(input: &Map) -> Result<usize> {
-    let goal = 500; //26501365;
+    let goal = 5000; //26501365;
     let start = input
         .iter()
         .find(|(_, v)| **v == Tile::Start)
@@ -140,12 +148,37 @@ pub fn solve_part2(input: &Map) -> Result<usize> {
     let size = Some(size(input)?);
 
     let mut result = vec![start];
-    for i in 0..goal {
+    let mut last = 0;
+    let mut diffs = vec![];
+    let mut results = vec![];
+    for i in 0..150 {
         result = can_reach(input, &result, &size);
-        println!("{}: {}", i, result.len());
+        println!("{}: {}, diff: {}", i, result.len(), result.len() - last);
+        diffs.push(result.len() - last);
+        last = result.len();
+        results.push(result.len());
     }
 
-    Ok(result.len())
+    let start = 42;
+    let cycle = 11;
+    let diff = diffs
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(cycle)
+        .map(|(i, v)| diffs[i + cycle] - *v)
+        .collect_vec();
+    let offsets = diffs.iter().skip(start).take(cycle).cloned().collect_vec();
+    println!("{:?}", diff);
+
+    let mut result = results[start - 1];
+    for i in start..goal {
+        let d = diff_at(i, &diff, &offsets);
+        println!("{}: {}", i, d);
+        result += diff_at(i, &diff, &offsets)
+    }
+
+    Ok(result)
 }
 
 #[cfg(test)]
