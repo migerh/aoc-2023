@@ -1,9 +1,6 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use itertools::{Itertools, MinMaxResult};
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    str::FromStr,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::utils::AocError::*;
 
@@ -30,17 +27,6 @@ type Map = HashMap<Coords, Tile>;
 
 #[aoc_generator(day21)]
 pub fn input_generator(input: &str) -> Result<Map> {
-    let input = "...........
-.....###.#.
-.###.##..#.
-..#.#...#..
-....#.#....
-.##..S####.
-.##..#...#.
-.......##..
-.##.#.####.
-.##..##.##.
-...........";
     input
         .lines()
         .filter(|s| !s.is_empty())
@@ -77,7 +63,7 @@ fn successors(map: &Map, pos: &Coords, size: &Option<Coords>) -> Vec<Coords> {
         .into_iter()
         .filter(|c| map.contains_key(c))
         .filter_map(|c| Some((c, map.get(&c)?)))
-        .filter(|(c, t)| **t == Tile::Plot || **t == Tile::Start)
+        .filter(|(_, t)| **t == Tile::Plot || **t == Tile::Start)
         .map(|(c, _)| c)
         .collect_vec()
     }
@@ -105,7 +91,7 @@ pub fn solve_part1(input: &Map) -> Result<usize> {
         .context("Could not find start")?;
 
     let mut result = vec![start];
-    for i in 0..goal {
+    for _ in 0..goal {
         result = can_reach(input, &result, &None);
     }
 
@@ -128,17 +114,14 @@ fn size(map: &Map) -> Result<Coords> {
     Ok((max_x + 1, max_y + 1))
 }
 
-fn diff_at(steps: usize, diffs: &Vec<usize>, offsets: &Vec<usize>) -> usize {
-    let start = 42;
-    let cycle = 11;
-
+fn diff_at(steps: usize, start: usize, cycle: usize, diffs: &[usize], offsets: &[usize]) -> usize {
     let observe = (steps - start) - (steps - start) % cycle;
     (observe / cycle) * diffs[(steps - start) % cycle] + offsets[(steps - start) % cycle]
 }
 
 #[aoc(day21, part2)]
 pub fn solve_part2(input: &Map) -> Result<usize> {
-    let goal = 5000; //26501365;
+    let goal = 26501365;
     let start = input
         .iter()
         .find(|(_, v)| **v == Tile::Start)
@@ -151,16 +134,17 @@ pub fn solve_part2(input: &Map) -> Result<usize> {
     let mut last = 0;
     let mut diffs = vec![];
     let mut results = vec![];
-    for i in 0..150 {
+    for _ in 0..460 {
         result = can_reach(input, &result, &size);
-        println!("{}: {}, diff: {}", i, result.len(), result.len() - last);
         diffs.push(result.len() - last);
         last = result.len();
         results.push(result.len());
     }
 
-    let start = 42;
-    let cycle = 11;
+    // these parameters are specific to my personal input and
+    // most likely won't work with other people's input.
+    let start = 193;
+    let cycle = 131;
     let diff = diffs
         .iter()
         .enumerate()
@@ -169,13 +153,10 @@ pub fn solve_part2(input: &Map) -> Result<usize> {
         .map(|(i, v)| diffs[i + cycle] - *v)
         .collect_vec();
     let offsets = diffs.iter().skip(start).take(cycle).cloned().collect_vec();
-    println!("{:?}", diff);
 
     let mut result = results[start - 1];
     for i in start..goal {
-        let d = diff_at(i, &diff, &offsets);
-        println!("{}: {}", i, d);
-        result += diff_at(i, &diff, &offsets)
+        result += diff_at(i, start, cycle, &diff, &offsets)
     }
 
     Ok(result)
@@ -186,22 +167,33 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "...........
+.....###.#.
+.###.##..#.
+..#.#...#..
+....#.#....
+.##..S####.
+.##..#...#.
+.......##..
+.##.#.####.
+.##..##.##.
+..........."
     }
 
-    fn input() -> Result<Vec<Thing>> {
+    fn input() -> Result<Map> {
         input_generator(sample())
     }
 
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(42, solve_part1(&data)?))
     }
 
-    #[test]
-    fn part2_sample() -> Result<()> {
-        let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
-    }
+    // skip this one as it takes a few seconds
+    // #[test]
+    // fn part2_sample() -> Result<()> {
+    //     let data = input()?;
+    //     Ok(assert_eq!(469538157381253, solve_part2(&data)?))
+    // }
 }
