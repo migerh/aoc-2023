@@ -29,7 +29,7 @@ Plotting the diffs looks like this for the first 150 values:
 ![Diffs](./plot-diff-sample.png)
 
 One can easily see the repeating pattern. After a closer look (at some chart
-tooltips) it's easy to see that this pattern starts with value 42 with a cycle
+tooltips) it's easy to see that this pattern starts with total `steps = 42` with a cycle
 length of 11. Each of the values within the cycle increases by a constant
 number:
 
@@ -59,7 +59,7 @@ diff #cycle  |   diff #cycle+1   |    diff of both diffs
  86          |   102             |    16
 
 For my real input (and most likely other inputs as well) the offset, cycle
-length and actual diff numbers will be different, if course, but can be
+length and actual diff numbers will be different, of course, but can be
 determined the same way. Using this information all that's left to do is
 calculate all the diffs for 1 step, 2 steps, ... etc. (see `diff_at()`) and sum
 up each diff for the number of tiles one can reach after 26501365 steps (see
