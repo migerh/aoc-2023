@@ -1,6 +1,6 @@
 use anyhow::{Context, Error, Result};
 use itertools::Itertools;
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use crate::utils::AocError::*;
 
@@ -13,7 +13,7 @@ pub struct Brick {
 }
 
 fn parse_coords(s: &str) -> Result<Coords> {
-    let mut split = s
+    let split = s
         .split(',')
         .map(|c| Ok(c.parse::<isize>()?))
         .collect::<Result<Vec<_>>>()?;
@@ -49,22 +49,6 @@ pub fn input_generator(input: &str) -> Result<Vec<Brick>> {
         .map(Brick::from_str)
         .collect::<Result<Vec<_>>>()
         .context("Error while parsing input")
-}
-
-fn generate_map(bricks: &[Brick]) -> HashMap<Coords, usize> {
-    let mut map = HashMap::new();
-
-    for (id, brick) in bricks.iter().enumerate() {
-        for z in brick.from.2..brick.to.2 {
-            for y in brick.from.1..brick.to.1 {
-                for x in brick.from.0..brick.to.0 {
-                    map.entry((x, y, z)).or_insert(id);
-                }
-            }
-        }
-    }
-
-    map
 }
 
 impl Brick {
