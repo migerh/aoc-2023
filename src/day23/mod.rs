@@ -1,6 +1,7 @@
 use anyhow::{Context, Error, Result};
 use itertools::Itertools;
 use pathfinding::prelude::dijkstra;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{collections::HashSet, str::FromStr};
 
 use crate::utils::AocError::*;
@@ -9,39 +10,39 @@ type Coords = (usize, usize);
 
 #[aoc_generator(day23)]
 pub fn input_generator(input: &str) -> Result<Vec<Vec<char>>> {
-    let input = "#.#####################
-#.......#########...###
-#######.#########.#.###
-###.....#.>.>.###.#.###
-###v#####.#v#.###.#.###
-###.>...#.#.#.....#...#
-###v###.#.#.#########.#
-###...#.#.#.......#...#
-#####.#.#.#######.#.###
-#.....#.#.#.......#...#
-#.#####.#.#.#########v#
-#.#...#...#...###...>.#
-#.#.#v#######v###.###v#
-#...#.>.#...>.>.#.###.#
-#####v#.#.###v#.#.###.#
-#.....#...#...#.#.#...#
-#.#########.###.#.#.###
-#...###...#...#...#.###
-###.###.#.###v#####v###
-#...#...#.#.>.>.#.>.###
-#.###.###.#.###.#.#v###
-#.....###...###...#...#
-#####################.#";
+//     let input = "#.#####################
+// #.......#########...###
+// #######.#########.#.###
+// ###.....#.>.>.###.#.###
+// ###v#####.#v#.###.#.###
+// ###.>...#.#.#.....#...#
+// ###v###.#.#.#########.#
+// ###...#.#.#.......#...#
+// #####.#.#.#######.#.###
+// #.....#.#.#.......#...#
+// #.#####.#.#.#########v#
+// #.#...#...#...###...>.#
+// #.#.#v#######v###.###v#
+// #...#.>.#...>.>.#.###.#
+// #####v#.#.###v#.#.###.#
+// #.....#...#...#.#.#...#
+// #.#########.###.#.#.###
+// #...###...#...#...#.###
+// ###.###.#.###v#####v###
+// #...#...#.#.>.>.#.>.###
+// #.###.###.#.###.#.#v###
+// #.....###...###...#...#
+// #####################.#";
 
-    let input = "#.######
-#......#
-#.####.#
-#....#.#
-####.#.#
-###..#.#
-###.##.#
-###....#
-######.#";
+//     let input = "#.######
+// #......#
+// #.####.#
+// #....#.#
+// ####.#.#
+// ###..#.#
+// ###.##.#
+// ###....#
+// ######.#";
     Ok(input
         .lines()
         .filter(|s| !s.is_empty())
@@ -71,8 +72,9 @@ fn check_candidate(
     width: usize,
     height: usize,
     p: &Coords,
-    visited: &[Coords],
+    visited: &[Vec<bool>],
     delta: &(isize, isize),
+    ignore_slopes: bool,
 ) -> Option<Coords> {
     let width = width as isize;
     let height = height as isize;
@@ -82,8 +84,12 @@ fn check_candidate(
     if p.0 >= 0 && p.0 < width && p.1 >= 0 && p.1 < height {
         let p = (p.0 as usize, p.1 as usize);
 
-        if visited.contains(&p) {
+        if visited[p.1][p.0] {
             return None;
+        }
+
+        if ignore_slopes && map[p.1][p.0] != '#' {
+            return Some(p);
         }
 
         if map[p.1][p.0] == '.' {
@@ -108,88 +114,93 @@ fn check_candidate(
 
 fn successors(
     map: &[Vec<char>],
-    visited: Vec<Coords>,
+    visited: &Vec<Vec<bool>>,
     width: usize,
     height: usize,
     p: &Coords,
-) -> Vec<(Coords, Vec<Coords>)> {
+    ignore_slopes: bool,
+) -> Vec<(Coords, usize)> {
     let directions = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+    let mut p = *p;
+    let mut count = 1;
 
-    directions
-        .iter()
-        .filter_map(|d| check_candidate(map, width, height, p, &visited, d))
-        .map(|p| {
-            let mut visited = visited.clone();
-            visited.push(p);
+    // loop {
+        let next = directions
+            .iter()
+            .filter_map(|d| check_candidate(map, width, height, &p, visited, d, ignore_slopes))
+            .collect_vec();
+    
+        // if next.len() != 1 {
+             return next.into_iter().map(|n| (n, count)).collect_vec();
+        // }
 
-            (p, visited)
-        })
-        .collect_vec()
+        // if next.is_empty() {
+        //     return vec![];
+        // }
+
+        // if next.len() == 1 {
+        //     count += 1;
+        //     p = next[0];
+        // }
+    // }
 }
 
 fn find_longest_path(
     map: &[Vec<char>],
-    visited: Vec<Coords>,
+    visited: &mut Vec<Vec<bool>>,
     width: usize,
     height: usize,
     p: &Coords,
     end: &Coords,
     len: usize,
+    ignore_slopes: bool,
 ) -> Option<usize> {
     if p == end {
         return Some(len);
     }
 
-    let next = successors(map, visited, width, height, p);
+    let next = successors(map, visited, width, height, p, ignore_slopes);
 
     next.into_iter()
-        .map(|n| find_longest_path(map, n.1.clone(), width, height, &n.0, end, len + 1))
+        .map(|(n, l)| {
+            visited[n.1][n.0] = true;
+            let result = find_longest_path(map, visited, width, height, &n, end, len + 1, ignore_slopes);
+            visited[n.1][n.0] = false;
+            result
+        })
         .max()?
 }
 
 #[aoc(day23, part1)]
 pub fn solve_part1(input: &[Vec<char>]) -> Result<usize> {
-    print(input);
-
     let width = input[0].len();
     let height = input.len();
 
     let start = find_start(input).context("Could not find start")?;
     let end = find_end(input).context("Could not find end")?;
-    let visited = vec![start];
+    let mut visited = vec![vec![false; width]; height];
+    visited[start.1][start.0] = true;
 
-    let result = find_longest_path(input, visited, width, height, &start, &end, 0)
+    let result = find_longest_path(input, &mut visited, width, height, &start, &end, 0, false)
         .context("Could not find longest path")?;
-
-    // let result = dijkstra(
-    //     &(start, visited.clone()),
-    //     |p| successors(input, p.1.clone(), width, height, &p.0),
-    //     |p| p.0 == end,
-    // )
-    // .context("Could not determine longest path")?;
-
-    // let path = result.0.iter().map(|r| r.0).collect_vec();
-
-    println!();
-    println!();
-    println!();
-    // for y in 0..input.len() {
-    //     for x in 0..input[y].len() {
-    //         if path.contains(&(x, y)) {
-    //             print!("O");
-    //         } else {
-    //             print!("{}", input[y][x]);
-    //         }
-    //     }
-    //     println!();
-    // }
 
     Ok(result)
 }
 
 #[aoc(day23, part2)]
-pub fn solve_part2(input: &[Vec<char>]) -> Result<u32> {
-    Ok(0)
+pub fn solve_part2(input: &[Vec<char>]) -> Result<usize> {
+    let width = input[0].len();
+    let height = input.len();
+
+    let start = find_start(input).context("Could not find start")?;
+    let end = find_end(input).context("Could not find end")?;
+    let mut visited = vec![vec![false; width]; height];
+    visited[start.1][start.0] = true;
+
+    let result = find_longest_path(input, &mut visited, width, height, &start, &end, 0, true)
+        .context("Could not find longest path")?;
+
+    Ok(result)
 }
 
 #[cfg(test)]
