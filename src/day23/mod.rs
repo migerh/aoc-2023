@@ -119,30 +119,13 @@ fn successors(
     height: usize,
     p: &Coords,
     ignore_slopes: bool,
-) -> Vec<(Coords, usize)> {
+) -> Vec<Coords> {
     let directions = [(1, 0), (0, 1), (-1, 0), (0, -1)];
-    let mut p = *p;
-    let mut count = 1;
 
-    // loop {
-        let next = directions
-            .iter()
-            .filter_map(|d| check_candidate(map, width, height, &p, visited, d, ignore_slopes))
-            .collect_vec();
-    
-        // if next.len() != 1 {
-             return next.into_iter().map(|n| (n, count)).collect_vec();
-        // }
-
-        // if next.is_empty() {
-        //     return vec![];
-        // }
-
-        // if next.len() == 1 {
-        //     count += 1;
-        //     p = next[0];
-        // }
-    // }
+    directions
+        .iter()
+        .filter_map(|d| check_candidate(map, width, height, p, visited, d, ignore_slopes))
+        .collect_vec()
 }
 
 fn find_longest_path(
@@ -162,7 +145,7 @@ fn find_longest_path(
     let next = successors(map, visited, width, height, p, ignore_slopes);
 
     next.into_iter()
-        .map(|(n, l)| {
+        .map(|n| {
             visited[n.1][n.0] = true;
             let result = find_longest_path(map, visited, width, height, &n, end, len + 1, ignore_slopes);
             visited[n.1][n.0] = false;
