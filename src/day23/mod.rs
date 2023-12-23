@@ -1,57 +1,15 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use itertools::Itertools;
-use pathfinding::prelude::dijkstra;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{collections::HashSet, str::FromStr};
-
-use crate::utils::AocError::*;
 
 type Coords = (usize, usize);
 
 #[aoc_generator(day23)]
 pub fn input_generator(input: &str) -> Result<Vec<Vec<char>>> {
-//     let input = "#.#####################
-// #.......#########...###
-// #######.#########.#.###
-// ###.....#.>.>.###.#.###
-// ###v#####.#v#.###.#.###
-// ###.>...#.#.#.....#...#
-// ###v###.#.#.#########.#
-// ###...#.#.#.......#...#
-// #####.#.#.#######.#.###
-// #.....#.#.#.......#...#
-// #.#####.#.#.#########v#
-// #.#...#...#...###...>.#
-// #.#.#v#######v###.###v#
-// #...#.>.#...>.>.#.###.#
-// #####v#.#.###v#.#.###.#
-// #.....#...#...#.#.#...#
-// #.#########.###.#.#.###
-// #...###...#...#...#.###
-// ###.###.#.###v#####v###
-// #...#...#.#.>.>.#.>.###
-// #.###.###.#.###.#.#v###
-// #.....###...###...#...#
-// #####################.#";
-
-//     let input = "#.######
-// #......#
-// #.####.#
-// #....#.#
-// ####.#.#
-// ###..#.#
-// ###.##.#
-// ###....#
-// ######.#";
     Ok(input
         .lines()
         .filter(|s| !s.is_empty())
         .map(|l| l.chars().collect_vec())
         .collect::<Vec<_>>())
-}
-
-fn print(map: &[Vec<char>]) {
-    map.iter().for_each(|l| println!("{}", l.iter().join("")));
 }
 
 fn find_path(map: &[Vec<char>], line: usize) -> Option<Coords> {
@@ -114,7 +72,7 @@ fn check_candidate(
 
 fn successors(
     map: &[Vec<char>],
-    visited: &Vec<Vec<bool>>,
+    visited: &[Vec<bool>],
     width: usize,
     height: usize,
     p: &Coords,
@@ -131,8 +89,7 @@ fn successors(
 fn find_longest_path(
     map: &[Vec<char>],
     visited: &mut Vec<Vec<bool>>,
-    width: usize,
-    height: usize,
+    size: (usize, usize),
     p: &Coords,
     end: &Coords,
     len: usize,
@@ -142,12 +99,14 @@ fn find_longest_path(
         return Some(len);
     }
 
+    let (width, height) = size;
     let next = successors(map, visited, width, height, p, ignore_slopes);
 
     next.into_iter()
         .map(|n| {
             visited[n.1][n.0] = true;
-            let result = find_longest_path(map, visited, width, height, &n, end, len + 1, ignore_slopes);
+            let result =
+                find_longest_path(map, visited, size, &n, end, len + 1, ignore_slopes);
             visited[n.1][n.0] = false;
             result
         })
@@ -164,7 +123,7 @@ pub fn solve_part1(input: &[Vec<char>]) -> Result<usize> {
     let mut visited = vec![vec![false; width]; height];
     visited[start.1][start.0] = true;
 
-    let result = find_longest_path(input, &mut visited, width, height, &start, &end, 0, false)
+    let result = find_longest_path(input, &mut visited, (width, height), &start, &end, 0, false)
         .context("Could not find longest path")?;
 
     Ok(result)
@@ -180,7 +139,7 @@ pub fn solve_part2(input: &[Vec<char>]) -> Result<usize> {
     let mut visited = vec![vec![false; width]; height];
     visited[start.1][start.0] = true;
 
-    let result = find_longest_path(input, &mut visited, width, height, &start, &end, 0, true)
+    let result = find_longest_path(input, &mut visited, (width, height), &start, &end, 0, true)
         .context("Could not find longest path")?;
 
     Ok(result)
@@ -191,22 +150,44 @@ mod test {
     use super::*;
 
     fn sample() -> &'static str {
-        ""
+        "#.#####################
+#.......#########...###
+#######.#########.#.###
+###.....#.>.>.###.#.###
+###v#####.#v#.###.#.###
+###.>...#.#.#.....#...#
+###v###.#.#.#########.#
+###...#.#.#.......#...#
+#####.#.#.#######.#.###
+#.....#.#.#.......#...#
+#.#####.#.#.#########v#
+#.#...#...#...###...>.#
+#.#.#v#######v###.###v#
+#...#.>.#...>.>.#.###.#
+#####v#.#.###v#.#.###.#
+#.....#...#...#.#.#...#
+#.#########.###.#.#.###
+#...###...#...#...#.###
+###.###.#.###v#####v###
+#...#...#.#.>.>.#.>.###
+#.###.###.#.###.#.#v###
+#.....###...###...#...#
+#####################.#"
     }
 
-    fn input() -> Result<Vec<Thing>> {
+    fn input() -> Result<Vec<Vec<char>>> {
         input_generator(sample())
     }
 
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(94, solve_part1(&data)?))
     }
 
     #[test]
     fn part2_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part2(&data)?))
+        Ok(assert_eq!(154, solve_part2(&data)?))
     }
 }
