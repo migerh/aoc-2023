@@ -12,7 +12,7 @@ opt-level = 3
 anyhow = "1.0.69"
 aoc-runner = "0.3.0"
 aoc-runner-derive = "0.3.0"
-itertools = "0.10.5"
+itertools = "0.12.0"
 regex = "1"
 lazy_static = "1.4.0"
 num = "0.4.0"
@@ -23,3 +23,4 @@ memoize = "0.4.0"
 thiserror = "1.0.38"
 rayon = "1.7.0"
 indicatif = "0.17.3"
+gauss_jordan_elimination = { version = "0.2.0", features = ["generic_calculation"] }
