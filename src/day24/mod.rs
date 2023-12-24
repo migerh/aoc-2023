@@ -117,8 +117,8 @@ pub fn input_generator(input: &str) -> Result<Vec<Stone>> {
 
 #[aoc(day24, part1)]
 pub fn solve_part1(input: &[Stone]) -> Result<u32> {
-    let min = 200000000000000.0;
-    let max = 400000000000000.0;
+    let len = input.len();
+    let (min, max) = if len == 5 { (7.0, 27.0) } else { (200000000000000.0, 400000000000000.0) };
 
     let mut count = 0;
     for i in 0..input.len() {
@@ -250,7 +250,7 @@ mod test {
     #[test]
     fn part1_sample() -> Result<()> {
         let data = input()?;
-        Ok(assert_eq!(0, solve_part1(&data)?))
+        Ok(assert_eq!(2, solve_part1(&data)?))
     }
 
     #[test]
