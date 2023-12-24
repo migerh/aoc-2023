@@ -1,24 +1,30 @@
 The hail stones in our input lines are given as
 
+```
 p[i] and v[i] for 0 ≤ i < #lines
+```
 
-Then the stone we through is
+and the stone we throw be `p` and `v`.
 
-p and v
+For each hailstone there is one `t[i] ≥ 0`, so that
 
-For each hailstone there is one t[i] ≥ 0 so that
-
+```
 p + t[i] * v == p[i] + t[i] * v[i]
+```
 
 With some transformation we get
 
+```
 p - p[i] == t[i] * (v[i] - v)
+```
 
-⇒ p - p[i] and v - v[i] are parallel
+⇒ `p - p[i]` and `v - v[i]` are parallel
 
 That means
 
+```
 (p - p[i]) x (v - v[i]) == 0
+```
 
 
 Applying the cross product gives
@@ -36,7 +42,7 @@ Applying the cross product gives
   p0v1 - p0vi1 - pi0v1 + pi0vi1 - p1v0 + p1vi0 + pi1v0 - pi1vi0 == 0
 ```
 
-Each equation has two summands that are not linear, e.g.:
+Each equation has parts that are not linear, e.g.:
 
 ```
   p1v2 - p2v1 - p1vi2 - pi1v2 + p2vi1 + pi2v1 + pi1vi2 - pi2vi1 == 0
