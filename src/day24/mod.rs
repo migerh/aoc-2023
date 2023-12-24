@@ -1,10 +1,6 @@
 use anyhow::{Context, Error, Result};
 use gauss_jordan_elimination::gauss_jordan_elimination_generic;
-use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::str::FromStr;
-
-use crate::utils::AocError::*;
 
 type Coords = (i128, i128, i128);
 type Coordsf = (f64, f64, f64);
@@ -127,10 +123,7 @@ pub fn solve_part1(input: &[Stone]) -> Result<u32> {
     let mut count = 0;
     for i in 0..input.len() {
         for j in (i + 1)..input.len() {
-            // println!("{:?}", input[i]);
-            // println!("{:?}", input[j]);
             if let Some(inter) = input[i].intersect(&input[j]) {
-                // println!("intersect @ {} {}", inter.0, inter.1);
                 if !input[i].point_in_future(inter) {
                     continue;
                 }
@@ -149,46 +142,27 @@ pub fn solve_part1(input: &[Stone]) -> Result<u32> {
     Ok(count)
 }
 
-fn does_solve(stones: &[Stone], pos: &Coords, vel: &Coords, t: &[i128]) -> bool {
-    for i in 0..3 {
-        let s = &stones[i];
-        if pos.0 + t[i] * vel.0 != s.pos.0 + t[i] * s.velocity.0 {
-            return false;
-        }
-
-        if pos.1 + t[i] * vel.1 != s.pos.1 + t[i] * s.velocity.1 {
-            return false;
-        }
-
-        if pos.2 + t[i] * vel.2 != s.pos.2 + t[i] * s.velocity.2 {
-            return false;
-        }
-    }
-
-    true
-}
-
 #[aoc(day24, part2)]
 pub fn solve_part2(input: &[Stone]) -> Result<i128> {
     let a = &input[0];
     let b = &input[1];
     let c = &input[2];
 
-    let pA = (a.pos.0 as f64, a.pos.1 as f64, a.pos.2 as f64);
-    let pB = (b.pos.0 as f64, b.pos.1 as f64, b.pos.2 as f64);
-    let pC = (c.pos.0 as f64, c.pos.1 as f64, c.pos.2 as f64);
+    let p_a = (a.pos.0 as f64, a.pos.1 as f64, a.pos.2 as f64);
+    let p_b = (b.pos.0 as f64, b.pos.1 as f64, b.pos.2 as f64);
+    let p_c = (c.pos.0 as f64, c.pos.1 as f64, c.pos.2 as f64);
 
-    let vA = (
+    let v_a = (
         a.velocity.0 as f64,
         a.velocity.1 as f64,
         a.velocity.2 as f64,
     );
-    let vB = (
+    let v_b = (
         b.velocity.0 as f64,
         b.velocity.1 as f64,
         b.velocity.2 as f64,
     );
-    let vC = (
+    let v_c = (
         c.velocity.0 as f64,
         c.velocity.1 as f64,
         c.velocity.2 as f64,
@@ -197,57 +171,57 @@ pub fn solve_part2(input: &[Stone]) -> Result<i128> {
     let mut m = vec![
         vec![
             0.0,
-            vB.2 - vA.2,
-            vA.1 - vB.1,
+            v_b.2 - v_a.2,
+            v_a.1 - v_b.1,
             0.0,
-            pA.2 - pB.2,
-            pB.1 - pA.1,
-            -(pB.1 * vB.2 - pB.2 * vB.1 + pA.2 * vA.1 - pA.1 * vA.2),
+            p_a.2 - p_b.2,
+            p_b.1 - p_a.1,
+            -(p_b.1 * v_b.2 - p_b.2 * v_b.1 + p_a.2 * v_a.1 - p_a.1 * v_a.2),
         ],
         vec![
-            vA.2 - vB.2,
+            v_a.2 - v_b.2,
             0.0,
-            vB.0 - vA.0,
-            pB.2 - pA.2,
+            v_b.0 - v_a.0,
+            p_b.2 - p_a.2,
             0.0,
-            pA.0 - pB.0,
-            -(pB.2 * vB.0 - pB.0 * vB.2 - pA.2 * vA.0 + pA.0 * vA.2),
+            p_a.0 - p_b.0,
+            -(p_b.2 * v_b.0 - p_b.0 * v_b.2 - p_a.2 * v_a.0 + p_a.0 * v_a.2),
         ],
         vec![
-            vB.1 - vA.1,
-            vA.0 - vB.0,
+            v_b.1 - v_a.1,
+            v_a.0 - v_b.0,
             0.0,
-            pA.1 - pB.1,
-            pB.0 - pA.0,
+            p_a.1 - p_b.1,
+            p_b.0 - p_a.0,
             0.0,
-            -(pB.0 * vB.1 - pB.1 * vB.0 - pA.0 * vA.1 + pA.1 * vA.0),
+            -(p_b.0 * v_b.1 - p_b.1 * v_b.0 - p_a.0 * v_a.1 + p_a.1 * v_a.0),
         ],
         vec![
             0.0,
-            vC.2 - vA.2,
-            vA.1 - vC.1,
+            v_c.2 - v_a.2,
+            v_a.1 - v_c.1,
             0.0,
-            pA.2 - pC.2,
-            pC.1 - pA.1,
-            -(pC.1 * vC.2 - pC.2 * vC.1 + pA.2 * vA.1 - pA.1 * vA.2),
+            p_a.2 - p_c.2,
+            p_c.1 - p_a.1,
+            -(p_c.1 * v_c.2 - p_c.2 * v_c.1 + p_a.2 * v_a.1 - p_a.1 * v_a.2),
         ],
         vec![
-            vA.2 - vC.2,
+            v_a.2 - v_c.2,
             0.0,
-            vC.0 - vA.0,
-            pC.2 - pA.2,
+            v_c.0 - v_a.0,
+            p_c.2 - p_a.2,
             0.0,
-            pA.0 - pC.0,
-            -(pC.2 * vC.0 - pC.0 * vC.2 - pA.2 * vA.0 + pA.0 * vA.2),
+            p_a.0 - p_c.0,
+            -(p_c.2 * v_c.0 - p_c.0 * v_c.2 - p_a.2 * v_a.0 + p_a.0 * v_a.2),
         ],
         vec![
-            vC.1 - vA.1,
-            vA.0 - vC.0,
+            v_c.1 - v_a.1,
+            v_a.0 - v_c.0,
             0.0,
-            pA.1 - pC.1,
-            pC.0 - pA.0,
+            p_a.1 - p_c.1,
+            p_c.0 - p_a.0,
             0.0,
-            -(pC.0 * vC.1 - pC.1 * vC.0 - pA.0 * vA.1 + pA.1 * vA.0),
+            -(p_c.0 * v_c.1 - p_c.1 * v_c.0 - p_a.0 * v_a.1 + p_a.1 * v_a.0),
         ],
     ];
     gauss_jordan_elimination_generic(&mut m);
